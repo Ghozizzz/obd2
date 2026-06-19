@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'fuel_calc.dart';
-import 'obd_connection.dart';
+import 'obd_transport.dart';
 import 'pids.dart';
 
 /// Snapshot of the latest decoded values for the UI.
@@ -51,10 +51,9 @@ class ObdData {
 /// Connects to the adapter and polls the fuel-relevant PIDs in a loop,
 /// emitting [ObdData] snapshots on [stream].
 class ObdService {
-  ObdService({ObdConnection? connection})
-      : _conn = connection ?? ObdConnection();
+  ObdService(this._transport);
 
-  final ObdConnection _conn;
+  ObdTransport _transport;
   final _controller = StreamController<ObdData>.broadcast();
   ObdData _state = const ObdData();
   bool _running = false;
@@ -62,10 +61,17 @@ class ObdService {
   Stream<ObdData> get stream => _controller.stream;
   ObdData get current => _state;
 
+  /// Swap to a new transport (e.g. WiFi → Bluetooth) and reconnect.
+  Future<void> restart(ObdTransport transport) async {
+    await stop();
+    _transport = transport;
+    await start();
+  }
+
   Future<void> start() async {
     if (_running) return;
     try {
-      await _conn.connect();
+      await _transport.connect();
       _state = _state.copyWith(connected: true, error: null);
       _emit();
       await _checkMafSupport();
@@ -80,7 +86,7 @@ class ObdService {
   /// Query 0100 bitmask; bit for PID 0x10 (MAF) is bit 16 from the MSB.
   Future<void> _checkMafSupport() async {
     try {
-      final raw = await _conn.send(Pids.supported);
+      final raw = await _transport.send(Pids.supported);
       final r = PidReply.parse(raw, 0x00);
       if (r != null && r.bytes.length >= 4) {
         final mask = (r.bytes[0] << 24) |
@@ -98,7 +104,7 @@ class ObdService {
   }
 
   Future<void> _loop() async {
-    while (_running && _conn.isConnected) {
+    while (_running && _transport.isConnected) {
       try {
         final speed = await _readSpeed();
         final throttle = await _readThrottle();
@@ -138,32 +144,32 @@ class ObdService {
   }
 
   Future<double?> _readMaf() async {
-    final r = PidReply.parse(await _conn.send(Pids.maf), 0x10);
+    final r = PidReply.parse(await _transport.send(Pids.maf), 0x10);
     return r == null ? null : Pids.decodeMaf(r);
   }
 
   Future<int?> _readSpeed() async {
-    final r = PidReply.parse(await _conn.send(Pids.speed), 0x0D);
+    final r = PidReply.parse(await _transport.send(Pids.speed), 0x0D);
     return r == null ? null : Pids.decodeSpeed(r);
   }
 
   Future<double?> _readThrottle() async {
-    final r = PidReply.parse(await _conn.send(Pids.throttle), 0x11);
+    final r = PidReply.parse(await _transport.send(Pids.throttle), 0x11);
     return r == null ? null : Pids.decodeThrottle(r);
   }
 
   Future<int?> _readRpm() async {
-    final r = PidReply.parse(await _conn.send(Pids.rpm), 0x0C);
+    final r = PidReply.parse(await _transport.send(Pids.rpm), 0x0C);
     return r == null ? null : Pids.decodeRpm(r);
   }
 
   Future<int?> _readMap() async {
-    final r = PidReply.parse(await _conn.send(Pids.map), 0x0B);
+    final r = PidReply.parse(await _transport.send(Pids.map), 0x0B);
     return r == null ? null : Pids.decodeMap(r);
   }
 
   Future<int?> _readIat() async {
-    final r = PidReply.parse(await _conn.send(Pids.iat), 0x0F);
+    final r = PidReply.parse(await _transport.send(Pids.iat), 0x0F);
     return r == null ? null : Pids.decodeIat(r);
   }
 
@@ -173,7 +179,7 @@ class ObdService {
 
   Future<void> stop() async {
     _running = false;
-    await _conn.close();
+    await _transport.close();
     _state = _state.copyWith(connected: false);
     _emit();
   }

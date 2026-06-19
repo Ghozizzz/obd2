@@ -10,7 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  wakelock_plus: ^1.2.5   # keep screen on while driving
+  flutter_bluetooth_serial: ^0.4.0
+  permission_handler: ^11.0.1
+  shared_preferences: ^2.2.3
+  wakelock_plus: ^1.1.6   # keep screen on while driving (1.1.x supports Dart 3.1)
 
 dev_dependencies:
   flutter_lints: ^3.0.0

@@ -25,8 +25,8 @@ class ObdSettings {
     this.hudColor = defaultHudColor,
   });
 
-  /// Default HUD accent (cyan) when the user hasn't picked one.
-  static const int defaultHudColor = 0xFF18FFFF; // Colors.cyanAccent
+  /// Default HUD accent (yellow) when the user hasn't picked one.
+  static const int defaultHudColor = 0xFFFFEB3B; // Colors.yellow
 
   ConnectionType type;
   String wifiHost;

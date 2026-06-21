@@ -36,6 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// A handful of high-contrast presets for the swatch picker.
   static const _swatches = <int>[
+    0xFFFFEB3B, // yellow (default)
     0xFF18FFFF, // cyan
     0xFFFFFFFF, // white
     0xFFFFC107, // amber
@@ -91,7 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final parsed = _parseHex(value);
     setState(() {
       if (parsed == null) {
-        _hexError = 'Invalid hex colour — use #RRGGBB (e.g. #18FFFF)';
+        _hexError = 'Invalid hex colour — use #RRGGBB (e.g. #FFEB3B)';
       } else {
         _hexError = null;
         _hudColor = parsed;
@@ -172,16 +173,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Connection'),
-        actions: [
-          TextButton(
-            onPressed: _save,
-            child: const Text('SAVE'),
-          ),
-        ],
-      ),
+    return WillPopScope(
+      // Intercept the back arrow / system back so leaving the screen still
+      // returns the chosen settings (template/mirror/colour) instead of null.
+      // _save() does the actual pop with the result, so we return false here.
+      onWillPop: () async {
+        _save();
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Connection'),
+          actions: [
+            TextButton(
+              onPressed: _save,
+              child: const Text('SAVE'),
+            ),
+          ],
+        ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -238,6 +247,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -289,7 +299,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           controller: _hex,
           decoration: InputDecoration(
             labelText: 'Hex colour',
-            hintText: '#18FFFF',
+            hintText: '#FFEB3B',
             prefixIcon: const Icon(Icons.tag),
             errorText: _hexError,
           ),

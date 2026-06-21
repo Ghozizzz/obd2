@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'hud_screen.dart';
+import 'monitor_screen.dart';
 import 'obd_service.dart';
 import 'obd_settings.dart';
 import 'settings_screen.dart';
@@ -68,6 +69,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openMonitor() {
+    final service = _service;
+    if (service == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => MonitorScreen(service: service)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final service = _service;
@@ -117,6 +126,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   : 'Waiting for the adapter…',
               enabled: d.connected,
               onTap: _openHud,
+            ),
+            const SizedBox(height: 16),
+            _menuTile(
+              icon: Icons.cable,
+              label: 'CAN Bus / Button Tester',
+              subtitle: d.connected
+                  ? 'Sniff frames — test wheel/cruise buttons'
+                  : 'Waiting for the adapter…',
+              enabled: d.connected,
+              onTap: _openMonitor,
             ),
             const SizedBox(height: 16),
             _menuTile(

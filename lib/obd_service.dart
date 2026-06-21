@@ -57,6 +57,7 @@ class ObdService {
   final _controller = StreamController<ObdData>.broadcast();
   ObdData _state = const ObdData();
   bool _running = false;
+  Future<void>? _loopDone;
 
   Stream<ObdData> get stream => _controller.stream;
   ObdData get current => _state;
@@ -68,6 +69,57 @@ class ObdService {
     await start();
   }
 
+  /// Stop the poll loop without disconnecting, waiting for any in-flight
+  /// command to drain. Used before entering raw monitor mode so the adapter
+  /// isn't being polled at the same time.
+  Future<void> pausePolling() async {
+    if (!_running) return;
+    _running = false;
+    await _loopDone;
+    _loopDone = null;
+  }
+
+  /// Resume the poll loop after [pausePolling] (re-connecting if needed).
+  Future<void> resumePolling() async {
+    if (_running) return;
+    if (!_transport.isConnected) {
+      await start();
+      return;
+    }
+    _running = true;
+    _loopDone = _loop();
+  }
+
+  /// Pause polling, switch the adapter into raw CAN-sniffing mode, and return a
+  /// stream of raw frame lines (e.g. `7E8 03 41 0C 1A F8`). Call [stopMonitor]
+  /// to leave monitor mode and resume normal polling.
+  ///
+  /// [protocol] is the ELM327 `ATSP` code; passive monitoring needs the bus
+  /// protocol set explicitly. Default `6` = ISO 15765-4 CAN, 11-bit / 500 kbps
+  /// (the most common on modern cars).
+  Future<Stream<String>> startMonitor({String protocol = '6'}) async {
+    await pausePolling();
+    // Best-effort setup; some adapters reject a command or two — keep going.
+    for (final cmd in ['ATSP$protocol', 'ATH1', 'ATCAF0']) {
+      try {
+        await _transport.send(cmd);
+      } catch (_) {/* ignore and try the next */}
+    }
+    final stream = _transport.beginMonitor();
+    _transport.sendRaw('ATMA'); // monitor all frames — streams until stopped
+    return stream;
+  }
+
+  /// Leave raw monitor mode and resume normal polling.
+  Future<void> stopMonitor() async {
+    await _transport.endMonitor();
+    try {
+      await _transport.send('ATCAF1'); // restore CAN auto-formatting
+      await _transport.send('ATH0'); // headers back off for PID parsing
+    } catch (_) {/* ignore — resumePolling re-reads what it needs */}
+    await resumePolling();
+  }
+
   Future<void> start() async {
     if (_running) return;
     try {
@@ -76,7 +128,7 @@ class ObdService {
       _emit();
       await _checkMafSupport();
       _running = true;
-      unawaited(_loop());
+      _loopDone = _loop();
     } catch (e) {
       _state = _state.copyWith(connected: false, error: '$e');
       _emit();

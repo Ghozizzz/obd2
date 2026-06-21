@@ -3,6 +3,7 @@ import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'obd_settings.dart';
+import 'preview_screen.dart';
 
 /// Connection settings: choose WiFi or Bluetooth and configure each. Returns
 /// the updated [ObdSettings] via Navigator.pop, or null if cancelled.
@@ -22,10 +23,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _btAddress;
   String? _btName;
   late bool _mirror;
+  late HudTemplate _template;
+
+  /// Currently chosen HUD colour and the hex text field driving it.
+  late int _hudColor;
+  late TextEditingController _hex;
+  String? _hexError;
 
   List<BluetoothDevice> _bonded = [];
   bool _loadingDevices = false;
   String? _btError;
+
+  /// A handful of high-contrast presets for the swatch picker.
+  static const _swatches = <int>[
+    0xFF18FFFF, // cyan
+    0xFFFFFFFF, // white
+    0xFFFFC107, // amber
+    0xFF4CAF50, // green
+    0xFFF44336, // red
+    0xFF2196F3, // blue
+    0xFF9C27B0, // purple
+    0xFFFF9800, // orange
+    0xFFE91E63, // pink
+    0xFFCDDC39, // lime
+  ];
+
+  /// "#RRGGBB" (or "#AARRGGBB") → ARGB int, or null if not a valid hex colour.
+  static int? _parseHex(String input) {
+    var s = input.trim();
+    if (s.startsWith('#')) s = s.substring(1);
+    if (!RegExp(r'^[0-9a-fA-F]+$').hasMatch(s)) return null;
+    if (s.length == 6) s = 'FF$s'; // assume fully opaque
+    if (s.length != 8) return null;
+    return int.parse(s, radix: 16);
+  }
+
+  /// ARGB int → "#RRGGBB" for display (alpha dropped).
+  static String _toHex(int argb) =>
+      '#${(argb & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 
   @override
   void initState() {
@@ -36,6 +71,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _btAddress = widget.settings.btAddress;
     _btName = widget.settings.btName;
     _mirror = widget.settings.mirror;
+    _template = widget.settings.template;
+    _hudColor = widget.settings.hudColor;
+    _hex = TextEditingController(text: _toHex(_hudColor));
     if (_type == ConnectionType.bluetooth) _loadBondedDevices();
   }
 
@@ -43,7 +81,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _host.dispose();
     _port.dispose();
+    _hex.dispose();
     super.dispose();
+  }
+
+  /// Apply a hex string from the text field: update the colour if valid,
+  /// otherwise show a warning and keep the previous colour.
+  void _onHexChanged(String value) {
+    final parsed = _parseHex(value);
+    setState(() {
+      if (parsed == null) {
+        _hexError = 'Invalid hex colour — use #RRGGBB (e.g. #18FFFF)';
+      } else {
+        _hexError = null;
+        _hudColor = parsed;
+      }
+    });
+  }
+
+  /// Pick a swatch: update the colour and sync the hex field.
+  void _pickSwatch(int argb) {
+    setState(() {
+      _hudColor = argb;
+      _hexError = null;
+      _hex.text = _toHex(argb);
+    });
   }
 
   /// Request the runtime permissions Bluetooth Classic needs (Android 12+
@@ -85,6 +147,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void _preview() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PreviewScreen(
+            template: _template, mirror: _mirror, color: Color(_hudColor)),
+      ),
+    );
+  }
+
   void _save() {
     final result = ObdSettings(
       type: _type,
@@ -93,6 +164,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       btAddress: _btAddress,
       btName: _btName,
       mirror: _mirror,
+      template: _template,
+      hudColor: _hudColor,
     );
     Navigator.of(context).pop(result);
   }
@@ -139,10 +212,91 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: _mirror,
             onChanged: (v) => setState(() => _mirror = v),
           ),
+          const Divider(height: 32),
+          const Text('HUD template',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          RadioListTile<HudTemplate>(
+            title: const Text('Template 1 — big km/L number'),
+            value: HudTemplate.number,
+            groupValue: _template,
+            onChanged: (v) => setState(() => _template = v!),
+          ),
+          RadioListTile<HudTemplate>(
+            title: const Text('Template 2 — 0–50 km/L bar'),
+            subtitle: const Text('Bar graph + number only, no other stats'),
+            value: HudTemplate.bar,
+            groupValue: _template,
+            onChanged: (v) => setState(() => _template = v!),
+          ),
+          const Divider(height: 32),
+          ..._colorFields(),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.play_circle_outline),
+            label: const Text('Preview (10s test, no connection)'),
+            onPressed: _preview,
+          ),
         ],
       ),
     );
   }
+
+  List<Widget> _colorFields() => [
+        Row(
+          children: [
+            const Text('HUD colour',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(width: 12),
+            // Live preview of the current colour.
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: Color(_hudColor),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white24),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Swatch picker.
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: _swatches.map((argb) {
+            final selected = (argb & 0xFFFFFF) == (_hudColor & 0xFFFFFF);
+            return GestureDetector(
+              onTap: () => _pickSwatch(argb),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Color(argb),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selected ? Colors.white : Colors.white24,
+                    width: selected ? 3 : 1,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 16),
+        // Manual hex entry with validation.
+        TextField(
+          controller: _hex,
+          decoration: InputDecoration(
+            labelText: 'Hex colour',
+            hintText: '#18FFFF',
+            prefixIcon: const Icon(Icons.tag),
+            errorText: _hexError,
+          ),
+          autocorrect: false,
+          onChanged: _onHexChanged,
+        ),
+      ];
 
   List<Widget> _wifiFields() => [
         TextField(

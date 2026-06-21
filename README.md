@@ -19,8 +19,45 @@ These `lib/` files are the app. Generate the platform shells around them:
 flutter create --org com.yourname --project-name obd2_hud .
 # overwrite lib/main.dart etc. with the files here, keep this pubspec.yaml
 flutter pub get
-flutter run
 ```
+
+## Run & build
+
+```bash
+flutter pub get                 # fetch dependencies (run once, and after pubspec changes)
+
+# Run on a connected device / emulator (hot reload)
+flutter emulators               # list attached emulators
+flutter devices                 # list attached devices
+flutter run                     # debug build on the default device
+flutter run -d <device-id>      # target a specific device
+flutter run --release           # run a release build (no hot reload)
+
+# Build installable artifacts
+flutter build apk --release             # single universal APK -> build/app/outputs/flutter-apk/app-release.apk
+flutter build apk --split-per-abi       # smaller per-architecture APKs
+flutter build appbundle --release       # Play Store bundle -> build/app/outputs/bundle/release/app-release.aab
+```
+
+Then install the APK on the phone:
+
+```bash
+flutter install                                  # install to the connected device
+# or, manually:
+adb install -r build/app/outputs/flutter-apk/app-release.apk
+```
+
+Housekeeping:
+
+```bash
+flutter doctor      # verify the toolchain is set up
+flutter clean       # wipe build/ if a build goes wrong, then `flutter pub get` again
+flutter analyze     # static analysis / lints
+```
+
+> On Windows, run the same commands in PowerShell. Connect the phone over USB
+> with USB debugging enabled (`adb devices` should list it), or use Wireless
+> debugging.
 
 ### Android permissions
 

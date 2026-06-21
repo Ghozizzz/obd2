@@ -6,6 +6,11 @@ import 'wifi_transport.dart';
 
 enum ConnectionType { wifi, bluetooth }
 
+/// Which HUD layout to render.
+/// [number] = big km/L digits with throttle/speed/rpm (Template 1).
+/// [bar] = 0–50 km/L bar + number only (Template 2).
+enum HudTemplate { number, bar }
+
 /// User connection preferences, persisted across launches via
 /// shared_preferences.
 class ObdSettings {
@@ -16,11 +21,22 @@ class ObdSettings {
     this.btAddress,
     this.btName,
     this.mirror = false,
+    this.template = HudTemplate.number,
+    this.hudColor = defaultHudColor,
   });
+
+  /// Default HUD accent (cyan) when the user hasn't picked one.
+  static const int defaultHudColor = 0xFF18FFFF; // Colors.cyanAccent
 
   ConnectionType type;
   String wifiHost;
   int wifiPort;
+
+  /// Which HUD layout to show (Template 1 = number, Template 2 = bar graph).
+  HudTemplate template;
+
+  /// ARGB value of the HUD readout colour the user chose.
+  int hudColor;
 
   /// Horizontally flip the HUD so it reads correctly when reflected off the
   /// windshield.
@@ -38,6 +54,8 @@ class ObdSettings {
   static const _kBtAddr = 'bt_address';
   static const _kBtName = 'bt_name';
   static const _kMirror = 'mirror';
+  static const _kTemplate = 'template';
+  static const _kColor = 'hud_color';
 
   static Future<ObdSettings> load() async {
     final p = await SharedPreferences.getInstance();
@@ -50,6 +68,10 @@ class ObdSettings {
       btAddress: p.getString(_kBtAddr),
       btName: p.getString(_kBtName),
       mirror: p.getBool(_kMirror) ?? false,
+      template: p.getInt(_kTemplate) == 1
+          ? HudTemplate.bar
+          : HudTemplate.number,
+      hudColor: p.getInt(_kColor) ?? defaultHudColor,
     );
   }
 
@@ -62,6 +84,8 @@ class ObdSettings {
     await p.setString(_kBtAddr, btAddress ?? '');
     await p.setString(_kBtName, btName ?? '');
     await p.setBool(_kMirror, mirror);
+    await p.setInt(_kTemplate, template == HudTemplate.bar ? 1 : 0);
+    await p.setInt(_kColor, hudColor);
   }
 
   /// Build the transport described by these settings.

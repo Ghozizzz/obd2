@@ -5,6 +5,8 @@ import 'monitor_screen.dart';
 import 'obd_service.dart';
 import 'obd_settings.dart';
 import 'settings_screen.dart';
+import 'trip_store.dart';
+import 'trips_screen.dart';
 
 /// App home. Owns the connection lifecycle (loads settings, builds the
 /// [ObdService], connects) and — once the adapter is reachable — presents a
@@ -19,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   ObdSettings? _settings;
   ObdService? _service;
+  TripStore? _tripStore;
 
   @override
   void initState() {
@@ -29,10 +32,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _boot() async {
     final settings = await ObdSettings.load();
     final service = ObdService(settings.buildTransport());
+    // Trip history is best-effort: if the DB fails to open, the HUD still runs.
+    TripStore? store;
+    try {
+      store = await TripStore.open();
+    } catch (_) {
+      store = null;
+    }
     if (!mounted) return;
     setState(() {
       _settings = settings;
       _service = service;
+      _tripStore = store;
     });
     service.start();
   }
@@ -40,6 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _service?.dispose();
+    _tripStore?.close();
     super.dispose();
   }
 
@@ -64,7 +76,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (service == null || settings == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => HudScreen(service: service, settings: settings),
+        builder: (_) => HudScreen(
+          service: service,
+          settings: settings,
+          tripStore: _tripStore,
+        ),
       ),
     );
   }
@@ -74,6 +90,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (service == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => MonitorScreen(service: service)),
+    );
+  }
+
+  void _openTrips() {
+    final store = _tripStore;
+    if (store == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => TripsScreen(store: store)),
     );
   }
 
@@ -136,6 +160,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   : 'Waiting for the adapter…',
               enabled: d.connected,
               onTap: _openMonitor,
+            ),
+            const SizedBox(height: 16),
+            _menuTile(
+              icon: Icons.history,
+              label: 'Trip History',
+              subtitle: _tripStore == null
+                  ? 'Unavailable on this device'
+                  : 'Past journeys — distance, fuel & avg km/L',
+              enabled: _tripStore != null,
+              onTap: _openTrips,
             ),
             const SizedBox(height: 16),
             _menuTile(

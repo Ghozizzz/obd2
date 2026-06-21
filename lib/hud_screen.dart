@@ -4,6 +4,8 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'hud_view.dart';
 import 'obd_service.dart';
 import 'obd_settings.dart';
+import 'trip_recorder.dart';
+import 'trip_store.dart';
 
 /// Full-screen HUD. White-on-black, big km/L readout, throttle bar that lights
 /// up when you press the pedal. Optionally mirrored (flipped horizontally) so
@@ -16,25 +18,40 @@ class HudScreen extends StatefulWidget {
     super.key,
     required this.service,
     required this.settings,
+    this.tripStore,
   });
 
   final ObdService service;
   final ObdSettings settings;
+
+  /// When provided, the whole HUD session is recorded as one trip. Null in
+  /// previews / when history is unavailable.
+  final TripStore? tripStore;
 
   @override
   State<HudScreen> createState() => _HudScreenState();
 }
 
 class _HudScreenState extends State<HudScreen> {
+  TripRecorder? _recorder;
+
   @override
   void initState() {
     super.initState();
     WakelockPlus.enable(); // keep screen on while driving
+    final store = widget.tripStore;
+    if (store != null) {
+      final recorder = TripRecorder(store);
+      _recorder = recorder;
+      // Records by riding the existing service stream — no extra polling.
+      recorder.start(widget.service.stream);
+    }
   }
 
   @override
   void dispose() {
     WakelockPlus.disable();
+    _recorder?.stop(); // finalise the trip when leaving the HUD
     super.dispose();
   }
 

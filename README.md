@@ -16,7 +16,7 @@ Shows instantaneous economy, throttle, speed, L/h, RPM. Not mirrored.
 These `lib/` files are the app. Generate the platform shells around them:
 
 ```bash
-flutter create --org com.yourname --project-name obd2_hud .
+flutter create --org com.yourname --project-name excar .
 # overwrite lib/main.dart etc. with the files here, keep this pubspec.yaml
 flutter pub get
 ```

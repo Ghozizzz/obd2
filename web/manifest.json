@@ -1,6 +1,6 @@
 {
-    "name": "obd2",
-    "short_name": "obd2",
+    "name": "ExCar",
+    "short_name": "ExCar",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

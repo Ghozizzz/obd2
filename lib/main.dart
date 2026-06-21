@@ -20,7 +20,7 @@ class ObdHudApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
-      title: 'OBD2 Fuel HUD',
+      title: 'ExCar',
       debugShowCheckedModeBanner: false,
       home: HudScreen(),
     );

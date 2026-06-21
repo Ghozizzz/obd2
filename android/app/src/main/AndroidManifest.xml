@@ -18,7 +18,7 @@
         android:maxSdkVersion="30"/>
 
     <application
-        android:label="obd2"
+        android:label="ExCar"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -1,4 +1,4 @@
-name: obd2_hud
+name: excar
 description: Live fuel consumption HUD for Nissan X-Trail T31 via ELM327 WiFi.
 publish_to: 'none'
 version: 1.0.0+1
@@ -17,6 +17,16 @@ dependencies:
 
 dev_dependencies:
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/excar.png"
+  remove_alpha_ios: true
+  # Adaptive icon for Android 8+ (avoids the source being cropped to a circle)
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/icon/excar.png"
 
 flutter:
   uses-material-design: true

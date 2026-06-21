@@ -10,14 +10,18 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  file_picker: ^6.1.1
   flutter_bluetooth_serial: ^0.4.0
-  path: ^1.9.0
+  path: ^1.8.3
+  path_provider: ^2.1.2
   permission_handler: ^11.0.1
   shared_preferences: ^2.2.3
   sqflite: ^2.3.2
   wakelock_plus: ^1.1.6   # keep screen on while driving (1.1.x supports Dart 3.1)
 
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
   flutter_lints: ^3.0.0
   flutter_launcher_icons: ^0.13.1
 

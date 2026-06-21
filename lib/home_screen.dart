@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
+import 'fuelio/fuelio_store.dart';
+import 'fuelio/logbook_screen.dart';
 import 'hud_screen.dart';
 import 'monitor_screen.dart';
 import 'obd_service.dart';
@@ -23,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ObdSettings? _settings;
   ObdService? _service;
   TripStore? _tripStore;
+  FuelioStore? _fuelioStore;
 
   @override
   void initState() {
@@ -43,11 +46,19 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {
       store = null;
     }
+    // Fuelio logbook store is likewise best-effort.
+    FuelioStore? fuelio;
+    try {
+      fuelio = await FuelioStore.open();
+    } catch (_) {
+      fuelio = null;
+    }
     if (!mounted) return;
     setState(() {
       _settings = settings;
       _service = service;
       _tripStore = store;
+      _fuelioStore = fuelio;
     });
     service.start();
   }
@@ -56,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _service?.dispose();
     _tripStore?.close();
+    _fuelioStore?.close();
     super.dispose();
   }
 
@@ -102,6 +114,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (store == null) return;
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => TripsScreen(store: store)),
+    );
+  }
+
+  void _openLogbook() {
+    final store = _fuelioStore;
+    if (store == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => LogbookScreen(store: store)),
     );
   }
 
@@ -174,6 +194,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   : 'Past journeys — distance, fuel & avg km/L',
               enabled: _tripStore != null,
               onTap: _openTrips,
+            ),
+            const SizedBox(height: 16),
+            _menuTile(
+              icon: Icons.menu_book,
+              label: 'Fuel & Cost Logbook',
+              subtitle: _fuelioStore == null
+                  ? 'Unavailable on this device'
+                  : 'Import Fuelio CSV, log fill-ups & costs',
+              enabled: _fuelioStore != null,
+              onTap: _openLogbook,
             ),
             const SizedBox(height: 16),
             _menuTile(

@@ -21,6 +21,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _port;
   String? _btAddress;
   String? _btName;
+  late bool _mirror;
 
   List<BluetoothDevice> _bonded = [];
   bool _loadingDevices = false;
@@ -34,6 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _port = TextEditingController(text: '${widget.settings.wifiPort}');
     _btAddress = widget.settings.btAddress;
     _btName = widget.settings.btName;
+    _mirror = widget.settings.mirror;
     if (_type == ConnectionType.bluetooth) _loadBondedDevices();
   }
 
@@ -90,6 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       wifiPort: int.tryParse(_port.text.trim()) ?? 35000,
       btAddress: _btAddress,
       btName: _btName,
+      mirror: _mirror,
     );
     Navigator.of(context).pop(result);
   }
@@ -128,6 +131,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const Divider(height: 32),
           if (_type == ConnectionType.wifi) ..._wifiFields() else ..._btFields(),
+          const Divider(height: 32),
+          SwitchListTile(
+            title: const Text('Mirror display'),
+            subtitle: const Text(
+                'Flip horizontally for windshield-reflected HUD viewing'),
+            value: _mirror,
+            onChanged: (v) => setState(() => _mirror = v),
+          ),
         ],
       ),
     );

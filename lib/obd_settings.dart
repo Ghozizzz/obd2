@@ -15,11 +15,16 @@ class ObdSettings {
     this.wifiPort = 35000,
     this.btAddress,
     this.btName,
+    this.mirror = false,
   });
 
   ConnectionType type;
   String wifiHost;
   int wifiPort;
+
+  /// Horizontally flip the HUD so it reads correctly when reflected off the
+  /// windshield.
+  bool mirror;
 
   /// MAC address of the chosen Bluetooth adapter (null until picked).
   String? btAddress;
@@ -32,6 +37,7 @@ class ObdSettings {
   static const _kPort = 'wifi_port';
   static const _kBtAddr = 'bt_address';
   static const _kBtName = 'bt_name';
+  static const _kMirror = 'mirror';
 
   static Future<ObdSettings> load() async {
     final p = await SharedPreferences.getInstance();
@@ -43,6 +49,7 @@ class ObdSettings {
       wifiPort: p.getInt(_kPort) ?? 35000,
       btAddress: p.getString(_kBtAddr),
       btName: p.getString(_kBtName),
+      mirror: p.getBool(_kMirror) ?? false,
     );
   }
 
@@ -54,6 +61,7 @@ class ObdSettings {
     await p.setInt(_kPort, wifiPort);
     await p.setString(_kBtAddr, btAddress ?? '');
     await p.setString(_kBtName, btName ?? '');
+    await p.setBool(_kMirror, mirror);
   }
 
   /// Build the transport described by these settings.

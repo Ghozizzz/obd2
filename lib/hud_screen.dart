@@ -5,8 +5,9 @@ import 'obd_service.dart';
 import 'obd_settings.dart';
 import 'settings_screen.dart';
 
-/// Full-screen HUD. Not mirrored. White-on-black, big km/L readout,
-/// throttle bar that lights up when you press the pedal.
+/// Full-screen HUD. White-on-black, big km/L readout, throttle bar that lights
+/// up when you press the pedal. Optionally mirrored (flipped horizontally) so
+/// the HUD reads correctly when reflected off the windshield.
 class HudScreen extends StatefulWidget {
   const HudScreen({super.key});
 
@@ -69,13 +70,19 @@ class _HudScreenState extends State<HudScreen> {
             if (service == null)
               const Center(child: CircularProgressIndicator())
             else
-              StreamBuilder<ObdData>(
-                stream: service.stream,
-                initialData: service.current,
-                builder: (context, snap) {
-                  final d = snap.data ?? const ObdData();
-                  return _body(d);
-                },
+              Transform(
+                alignment: Alignment.center,
+                // Flip horizontally when mirroring is enabled.
+                transform: Matrix4.diagonal3Values(
+                    _settings?.mirror == true ? -1.0 : 1.0, 1.0, 1.0),
+                child: StreamBuilder<ObdData>(
+                  stream: service.stream,
+                  initialData: service.current,
+                  builder: (context, snap) {
+                    final d = snap.data ?? const ObdData();
+                    return _body(d);
+                  },
+                ),
               ),
             Positioned(
               top: 4,

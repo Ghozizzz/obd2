@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import 'hud_screen.dart';
@@ -36,6 +37,9 @@ class _HomeScreenState extends State<HomeScreen> {
     TripStore? store;
     try {
       store = await TripStore.open();
+      // In debug builds, seed demo trips so the history screen has something to
+      // show without a live drive. No-op once real trips exist.
+      if (kDebugMode) await store.seedSampleData();
     } catch (_) {
       store = null;
     }

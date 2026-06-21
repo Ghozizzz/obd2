@@ -182,82 +182,271 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return false;
       },
       child: Scaffold(
+        backgroundColor: Colors.black,
         appBar: AppBar(
-          title: const Text('Connection'),
+          title: const Text('Settings'),
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          elevation: 0,
           actions: [
-            TextButton(
-              onPressed: _save,
-              child: const Text('SAVE'),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilledButton(
+                onPressed: _save,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.cyan,
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('SAVE'),
+              ),
             ),
           ],
         ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          RadioListTile<ConnectionType>(
-            title: const Text('WiFi (ELM327 WiFi adapter)'),
-            subtitle: const Text('Join the adapter\'s WiFi network first'),
-            value: ConnectionType.wifi,
-            groupValue: _type,
-            onChanged: (v) => setState(() => _type = v!),
-          ),
-          RadioListTile<ConnectionType>(
-            title: const Text('Bluetooth (ELM327 BT adapter)'),
-            subtitle: const Text('Pair the adapter in Android settings first'),
-            value: ConnectionType.bluetooth,
-            groupValue: _type,
-            onChanged: (v) {
-              setState(() => _type = v!);
-              if (_bonded.isEmpty) _loadBondedDevices();
-            },
-          ),
-          const Divider(height: 32),
-          if (_type == ConnectionType.wifi) ..._wifiFields() else ..._btFields(),
-          const Divider(height: 32),
-          SwitchListTile(
-            title: const Text('Mirror display'),
-            subtitle: const Text(
-                'Flip horizontally for windshield-reflected HUD viewing'),
-            value: _mirror,
-            onChanged: (v) => setState(() => _mirror = v),
-          ),
-          const Divider(height: 32),
-          const Text('HUD template',
-              style: TextStyle(fontWeight: FontWeight.bold)),
-          RadioListTile<HudTemplate>(
-            title: const Text('Template 1 — big km/L number'),
-            value: HudTemplate.number,
-            groupValue: _template,
-            onChanged: (v) => setState(() => _template = v!),
-          ),
-          RadioListTile<HudTemplate>(
-            title: const Text('Template 2 — 0–50 km/L bar'),
-            subtitle: const Text('Bar graph + number only, no other stats'),
-            value: HudTemplate.bar,
-            groupValue: _template,
-            onChanged: (v) => setState(() => _template = v!),
-          ),
-          const Divider(height: 32),
-          ..._colorFields(),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.play_circle_outline),
-            label: const Text('Preview (10s test, no connection)'),
-            onPressed: _preview,
-          ),
-        ],
-      ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          children: [
+            _section(
+              icon: Icons.settings_input_antenna,
+              title: 'Connection',
+              children: [
+                _connectionTypeSelector(),
+                const SizedBox(height: 8),
+                if (_type == ConnectionType.wifi)
+                  ..._wifiFields()
+                else
+                  ..._btFields(),
+              ],
+            ),
+            _section(
+              icon: Icons.dashboard_customize,
+              title: 'HUD Template',
+              children: _templateFields(),
+            ),
+            _section(
+              icon: Icons.palette,
+              title: 'HUD Colour',
+              children: _colorFields(),
+            ),
+            _section(
+              icon: Icons.flip,
+              title: 'Display',
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  activeColor: Colors.cyan,
+                  title: const Text('Mirror display',
+                      style: TextStyle(color: Colors.white)),
+                  subtitle: const Text(
+                    'Flip horizontally for windshield-reflected HUD viewing',
+                    style: TextStyle(color: Colors.white54),
+                  ),
+                  value: _mirror,
+                  onChanged: (v) => setState(() => _mirror = v),
+                ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.play_circle_outline),
+                    label: const Text('Preview (10s test, no connection)'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.cyan,
+                      side: const BorderSide(color: Colors.white24),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: _preview,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
+  /// A titled card grouping related settings — the building block of the page.
+  Widget _section({
+    required IconData icon,
+    required String title,
+    required List<Widget> children,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      decoration: BoxDecoration(
+        color: Colors.white10,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: Colors.cyan),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  /// WiFi / Bluetooth chooser as a pair of pill-style segmented buttons.
+  Widget _connectionTypeSelector() {
+    Widget pill(ConnectionType type, IconData icon, String label) {
+      final selected = _type == type;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () {
+            setState(() => _type = type);
+            if (type == ConnectionType.bluetooth && _bonded.isEmpty) {
+              _loadBondedDevices();
+            }
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: selected ? Colors.cyan.withOpacity(0.18) : Colors.white10,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected ? Colors.cyan : Colors.white12,
+                width: selected ? 2 : 1,
+              ),
+            ),
+            child: Column(
+              children: [
+                Icon(icon,
+                    color: selected ? Colors.cyan : Colors.white54, size: 26),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: selected ? Colors.white : Colors.white54,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        pill(ConnectionType.wifi, Icons.wifi, 'WiFi'),
+        const SizedBox(width: 12),
+        pill(ConnectionType.bluetooth, Icons.bluetooth, 'Bluetooth'),
+      ],
+    );
+  }
+
+  List<Widget> _templateFields() => [
+        _templateOption(
+          template: HudTemplate.number,
+          title: 'Big km/L number',
+          subtitle: 'Large readout with throttle, speed, L/h & RPM',
+        ),
+        const SizedBox(height: 10),
+        _templateOption(
+          template: HudTemplate.bar,
+          title: '0–50 km/L bar',
+          subtitle: 'Bar graph + number only, no other stats',
+        ),
+      ];
+
+  Widget _templateOption({
+    required HudTemplate template,
+    required String title,
+    required String subtitle,
+  }) {
+    final selected = _template == template;
+    return GestureDetector(
+      onTap: () => setState(() => _template = template),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? Colors.cyan.withOpacity(0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? Colors.cyan : Colors.white12,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: selected ? Colors.cyan : Colors.white38,
+              size: 22,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style:
+                          const TextStyle(color: Colors.white54, fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Dark-theme decoration shared by the text inputs on this page.
+  InputDecoration _fieldDecoration({
+    required String label,
+    String? hint,
+    Widget? prefixIcon,
+    String? errorText,
+  }) =>
+      InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: prefixIcon,
+        errorText: errorText,
+        labelStyle: const TextStyle(color: Colors.white54),
+        hintStyle: const TextStyle(color: Colors.white24),
+        filled: true,
+        fillColor: Colors.black26,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.white12),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.cyan),
+        ),
+      );
+
   List<Widget> _colorFields() => [
+        // Live preview of the current colour next to a short hint.
         Row(
           children: [
-            const Text('HUD colour',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(width: 12),
-            // Live preview of the current colour.
             Container(
               width: 28,
               height: 28,
@@ -267,9 +456,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 border: Border.all(color: Colors.white24),
               ),
             ),
+            const SizedBox(width: 12),
+            const Text('Tap a swatch or enter a hex code',
+                style: TextStyle(color: Colors.white54, fontSize: 13)),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         // Swatch picker.
         Wrap(
           spacing: 12,
@@ -297,10 +489,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // Manual hex entry with validation.
         TextField(
           controller: _hex,
-          decoration: InputDecoration(
-            labelText: 'Hex colour',
-            hintText: '#FFEB3B',
-            prefixIcon: const Icon(Icons.tag),
+          style: const TextStyle(color: Colors.white),
+          decoration: _fieldDecoration(
+            label: 'Hex colour',
+            hint: '#FFEB3B',
+            prefixIcon: const Icon(Icons.tag, color: Colors.white38),
             errorText: _hexError,
           ),
           autocorrect: false,
@@ -309,21 +502,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ];
 
   List<Widget> _wifiFields() => [
+        const Text('Join the adapter\'s WiFi network first',
+            style: TextStyle(color: Colors.white54, fontSize: 13)),
+        const SizedBox(height: 14),
         TextField(
           controller: _host,
-          decoration: const InputDecoration(
-            labelText: 'Host / IP',
-            hintText: '192.168.0.10',
-          ),
+          style: const TextStyle(color: Colors.white),
+          decoration: _fieldDecoration(label: 'Host / IP', hint: '192.168.0.10'),
           keyboardType: TextInputType.url,
         ),
         const SizedBox(height: 16),
         TextField(
           controller: _port,
-          decoration: const InputDecoration(
-            labelText: 'Port',
-            hintText: '35000',
-          ),
+          style: const TextStyle(color: Colors.white),
+          decoration: _fieldDecoration(label: 'Port', hint: '35000'),
           keyboardType: TextInputType.number,
         ),
       ];
@@ -333,9 +525,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text('Paired devices',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+                style: TextStyle(
+                    color: Colors.white70, fontWeight: FontWeight.w500)),
             IconButton(
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh, color: Colors.cyan),
               onPressed: _loadingDevices ? null : _loadBondedDevices,
             ),
           ],
@@ -353,21 +546,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         if (!_loadingDevices && _bonded.isEmpty && _btError == null)
           const Padding(
-            padding: EdgeInsets.all(8),
+            padding: EdgeInsets.symmetric(vertical: 8),
             child: Text(
-                'No paired devices found. Pair your ELM327 in Android '
-                'Bluetooth settings (PIN is usually 1234 or 0000), then tap '
-                'refresh.'),
+              'No paired devices found. Pair your ELM327 in Android '
+              'Bluetooth settings (PIN is usually 1234 or 0000), then tap '
+              'refresh.',
+              style: TextStyle(color: Colors.white54, fontSize: 13),
+            ),
           ),
-        ..._bonded.map((d) => RadioListTile<String>(
-              title: Text(d.name ?? d.address),
-              subtitle: Text(d.address),
-              value: d.address,
-              groupValue: _btAddress,
-              onChanged: (v) => setState(() {
-                _btAddress = v;
-                _btName = d.name;
-              }),
-            )),
+        ..._bonded.map((d) {
+          final selected = _btAddress == d.address;
+          return GestureDetector(
+            onTap: () => setState(() {
+              _btAddress = d.address;
+              _btName = d.name;
+            }),
+            child: Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color:
+                    selected ? Colors.cyan.withOpacity(0.12) : Colors.black26,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: selected ? Colors.cyan : Colors.white12,
+                  width: selected ? 2 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    selected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                    color: selected ? Colors.cyan : Colors.white38,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(d.name ?? d.address,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 15)),
+                        const SizedBox(height: 2),
+                        Text(d.address,
+                            style: const TextStyle(
+                                color: Colors.white54, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
       ];
 }

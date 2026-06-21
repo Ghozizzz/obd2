@@ -55,5 +55,52 @@ class TripStore {
     return rows.map(Trip.fromMap).toList();
   }
 
+  /// Number of trips currently stored.
+  Future<int> count() async {
+    final rows = await _db.rawQuery('SELECT COUNT(*) AS n FROM $_table');
+    return Sqflite.firstIntValue(rows) ?? 0;
+  }
+
+  /// Populate the table with a handful of demo trips so the history screen can
+  /// be previewed without a live OBD session. No-op if any trips already exist,
+  /// so it never clobbers real recordings. Anchored to [now] so the dates read
+  /// as "recent" whenever it runs.
+  Future<void> seedSampleData({DateTime? now}) async {
+    if (await count() > 0) return;
+    final base = now ?? DateTime.now();
+    DateTime at(int daysAgo, int h, int m) =>
+        DateTime(base.year, base.month, base.day - daysAgo, h, m);
+
+    final samples = <Trip>[
+      Trip(
+        startedAt: at(0, 8, 12),
+        endedAt: at(0, 8, 47),
+        distanceKm: 23.4,
+        fuelLiters: 1.62, // ~14.4 km/L — green
+      ),
+      Trip(
+        startedAt: at(1, 18, 5),
+        endedAt: at(1, 18, 52),
+        distanceKm: 41.8,
+        fuelLiters: 3.95, // ~10.6 km/L — amber
+      ),
+      Trip(
+        startedAt: at(1, 7, 30),
+        endedAt: at(1, 9, 6),
+        distanceKm: 88.2,
+        fuelLiters: 5.10, // ~17.3 km/L — green, 1h 36m
+      ),
+      Trip(
+        startedAt: at(2, 12, 0),
+        endedAt: at(2, 12, 22),
+        distanceKm: 6.3,
+        fuelLiters: 0.84, // ~7.5 km/L — red, short city hop
+      ),
+    ];
+    for (final t in samples) {
+      await insert(t);
+    }
+  }
+
   Future<void> close() => _db.close();
 }

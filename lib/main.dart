@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'hud_screen.dart';
+import 'home_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +22,7 @@ class ObdHudApp extends StatelessWidget {
     return const MaterialApp(
       title: 'ExCar',
       debugShowCheckedModeBanner: false,
-      home: HudScreen(),
+      home: HomeScreen(),
     );
   }
 }

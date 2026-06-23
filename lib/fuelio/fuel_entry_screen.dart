@@ -6,10 +6,15 @@ import 'fuelio_models.dart';
 /// Add or edit a single fuel fill-up. Returns the saved [FuelEntry] via
 /// Navigator.pop, or null if cancelled.
 class FuelEntryScreen extends StatefulWidget {
-  const FuelEntryScreen({super.key, this.entry});
+  const FuelEntryScreen({super.key, this.entry, this.lastOdo});
 
   /// The entry to edit, or null to create a new one.
   final FuelEntry? entry;
+
+  /// Odometer of the most recent fill-up. When adding a new entry, the field is
+  /// pre-filled with this value's leading 3 digits (the part that rarely changes
+  /// between fills) so the user only types the remaining digits.
+  final double? lastOdo;
 
   @override
   State<FuelEntryScreen> createState() => _FuelEntryScreenState();
@@ -30,7 +35,7 @@ class _FuelEntryScreenState extends State<FuelEntryScreen> {
     super.initState();
     final e = widget.entry;
     _date = e?.date ?? DateTime.now();
-    _odo = TextEditingController(text: e == null ? '' : _num(e.odo));
+    _odo = TextEditingController(text: e == null ? _odoPrefill() : _num(e.odo));
     _fuel = TextEditingController(text: e == null ? '' : _num(e.fuel));
     _price = TextEditingController(text: e == null ? '' : _num(e.price));
     _city = TextEditingController(text: e?.city ?? '');
@@ -40,6 +45,16 @@ class _FuelEntryScreenState extends State<FuelEntryScreen> {
 
   static String _num(double v) =>
       v == v.roundToDouble() ? v.toStringAsFixed(0) : '$v';
+
+  /// Leading 3 digits of the last record's odometer, used as the starting value
+  /// for a new fill-up so the whole number need not be retyped. Empty when there
+  /// is no previous reading.
+  String _odoPrefill() {
+    final last = widget.lastOdo;
+    if (last == null || last <= 0) return '';
+    final digits = last.toStringAsFixed(0);
+    return digits.length <= 3 ? digits : digits.substring(0, 3);
+  }
 
   @override
   void dispose() {

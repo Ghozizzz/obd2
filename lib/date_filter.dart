@@ -99,6 +99,7 @@ class DateFilterBar extends StatelessWidget {
   Future<void> _open(BuildContext context) async {
     final picked = await showModalBottomSheet<DateFilter>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: const Color(0xFF1A1A1A),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -200,9 +201,10 @@ class _FilterSheet extends StatelessWidget {
     }
 
     return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           Container(
             margin: const EdgeInsets.symmetric(vertical: 10),
             width: 40,
@@ -251,6 +253,7 @@ class _FilterSheet extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
+        ),
       ),
     );
   }

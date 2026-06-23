@@ -84,7 +84,10 @@ class _LogbookScreenState extends State<LogbookScreen>
 
   Future<void> _editFuel([FuelEntry? e]) async {
     final saved = await Navigator.of(context).push<FuelEntry>(
-      MaterialPageRoute(builder: (_) => FuelEntryScreen(entry: e)),
+      MaterialPageRoute(
+        builder: (_) =>
+            FuelEntryScreen(entry: e, lastOdo: e == null ? _lastOdo() : null),
+      ),
     );
     if (saved == null) return;
     if (saved.id == null) {
@@ -93,6 +96,15 @@ class _LogbookScreenState extends State<LogbookScreen>
       await widget.store.updateFuel(saved);
     }
     await _reload();
+  }
+
+  /// Odometer of the most recent fill-up (the list is sorted newest-first), or
+  /// null if no entry has a reading yet. Used to pre-fill a new fill-up.
+  double? _lastOdo() {
+    for (final e in _fuel) {
+      if (e.odo > 0) return e.odo;
+    }
+    return null;
   }
 
   Future<void> _editCost([CostEntry? e]) async {

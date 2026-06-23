@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'date_filter.dart';
 import 'trip.dart';
 import 'trip_store.dart';
 
@@ -16,6 +17,7 @@ class TripsScreen extends StatefulWidget {
 
 class _TripsScreenState extends State<TripsScreen> {
   late Future<List<Trip>> _trips;
+  DateFilter _filter = const DateFilter();
 
   @override
   void initState() {
@@ -48,16 +50,30 @@ class _TripsScreenState extends State<TripsScreen> {
           if (!snap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final trips = snap.data!;
-          if (trips.isEmpty) return _empty();
+          final all = snap.data!;
+          if (all.isEmpty) return _empty();
+          final trips =
+              all.where((t) => _filter.contains(t.startedAt)).toList();
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: [
-              _summary(trips),
-              const SizedBox(height: 20),
-              for (final t in trips) ...[
-                _card(t),
-                const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: DateFilterBar(
+                  filter: _filter,
+                  onChanged: (f) => setState(() => _filter = f),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (trips.isEmpty)
+                _noneInRange()
+              else ...[
+                _summary(trips),
+                const SizedBox(height: 20),
+                for (final t in trips) ...[
+                  _card(t),
+                  const SizedBox(height: 12),
+                ],
               ],
             ],
           );
@@ -92,6 +108,19 @@ class _TripsScreenState extends State<TripsScreen> {
               ),
             ],
           ),
+        ),
+      );
+
+  Widget _noneInRange() => Padding(
+        padding: const EdgeInsets.only(top: 64),
+        child: Column(
+          children: [
+            Icon(Icons.event_busy,
+                size: 56, color: Colors.white.withOpacity(0.18)),
+            const SizedBox(height: 16),
+            const Text('No trips in this range',
+                style: TextStyle(color: Colors.white54, fontSize: 15)),
+          ],
         ),
       );
 

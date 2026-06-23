@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../date_filter.dart';
 import 'cost_entry_screen.dart';
 import 'fuel_entry_screen.dart';
 import 'fuelio_csv.dart';
@@ -34,6 +35,7 @@ class _LogbookScreenState extends State<LogbookScreen>
   FuelioVehicle? _vehicle;
   bool _loading = true;
   bool _busy = false;
+  DateFilter _filter = const DateFilter();
 
   @override
   void initState() {
@@ -354,8 +356,9 @@ class _LogbookScreenState extends State<LogbookScreen>
       return _empty(Icons.local_gas_station, 'No fuel fill-ups',
           'Tap + to add one, or import a Fuelio CSV.');
     }
-    final totalFuel = _fuel.fold<double>(0, (s, e) => s + e.fuel);
-    final totalPrice = _fuel.fold<double>(0, (s, e) => s + e.price);
+    final fuel = _fuel.where((e) => _filter.contains(e.date)).toList();
+    final totalFuel = fuel.fold<double>(0, (s, e) => s + e.fuel);
+    final totalPrice = fuel.fold<double>(0, (s, e) => s + e.price);
     return RefreshIndicator(
       onRefresh: _reload,
       child: ListView(
@@ -365,13 +368,19 @@ class _LogbookScreenState extends State<LogbookScreen>
             _vehicleHeader(_vehicle!),
             const SizedBox(height: 16),
           ],
-          _summaryCard([
-            _stat('${_fuel.length}', 'fills'),
-            _stat('${totalFuel.toStringAsFixed(0)} L', 'fuel'),
-            _stat(_money(totalPrice), 'spent'),
-          ]),
+          _filterBar(),
           const SizedBox(height: 16),
-          for (final e in _fuel) _fuelCard(e),
+          if (fuel.isEmpty)
+            _noneInRange()
+          else ...[
+            _summaryCard([
+              _stat('${fuel.length}', 'fills'),
+              _stat('${totalFuel.toStringAsFixed(0)} L', 'fuel'),
+              _stat(_money(totalPrice), 'spent'),
+            ]),
+            const SizedBox(height: 16),
+            for (final e in fuel) _fuelCard(e),
+          ],
         ],
       ),
     );
@@ -486,10 +495,11 @@ class _LogbookScreenState extends State<LogbookScreen>
       return _empty(Icons.receipt_long, 'No costs yet',
           'Tap + to add a cost, or import a Fuelio CSV.');
     }
-    final spent = _costs
+    final costs = _costs.where((c) => _filter.contains(c.date)).toList();
+    final spent = costs
         .where((c) => !c.isIncome)
         .fold<double>(0, (s, e) => s + e.cost);
-    final income = _costs
+    final income = costs
         .where((c) => c.isIncome)
         .fold<double>(0, (s, e) => s + e.cost);
     return RefreshIndicator(
@@ -497,17 +507,23 @@ class _LogbookScreenState extends State<LogbookScreen>
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
         children: [
-          _summaryCard([
-            _stat('${_costs.length}', 'entries'),
-            _stat(_money(spent), 'spent'),
-            if (income > 0) _stat(_money(income), 'income'),
-          ]),
-          if (spent > 0) ...[
-            const SizedBox(height: 16),
-            _categoryBreakdown(spent),
-          ],
+          _filterBar(),
           const SizedBox(height: 16),
-          for (final e in _costs) _costCard(e),
+          if (costs.isEmpty)
+            _noneInRange()
+          else ...[
+            _summaryCard([
+              _stat('${costs.length}', 'entries'),
+              _stat(_money(spent), 'spent'),
+              if (income > 0) _stat(_money(income), 'income'),
+            ]),
+            if (spent > 0) ...[
+              const SizedBox(height: 16),
+              _categoryBreakdown(costs, spent),
+            ],
+            const SizedBox(height: 16),
+            for (final e in costs) _costCard(e),
+          ],
         ],
       ),
     );
@@ -552,11 +568,11 @@ class _LogbookScreenState extends State<LogbookScreen>
         ),
       );
 
-  /// Spending-by-category bars, biggest first. [spent] is the grand total of
-  /// non-income costs (used to scale the bars).
-  Widget _categoryBreakdown(double spent) {
+  /// Spending-by-category bars, biggest first. [costs] is the (filtered) cost
+  /// list and [spent] their non-income total (used to scale the bars).
+  Widget _categoryBreakdown(List<CostEntry> costs, double spent) {
     final totals = <int, double>{};
-    for (final c in _costs) {
+    for (final c in costs) {
       if (c.isIncome) continue;
       totals[c.costTypeId] = (totals[c.costTypeId] ?? 0) + c.cost;
     }
@@ -745,6 +761,27 @@ class _LogbookScreenState extends State<LogbookScreen>
   }
 
   // ── Shared widgets ───────────────────────────────────────────────────────
+
+  Widget _filterBar() => Align(
+        alignment: Alignment.centerLeft,
+        child: DateFilterBar(
+          filter: _filter,
+          onChanged: (f) => setState(() => _filter = f),
+        ),
+      );
+
+  Widget _noneInRange() => Padding(
+        padding: const EdgeInsets.only(top: 56),
+        child: Column(
+          children: [
+            Icon(Icons.event_busy,
+                size: 56, color: Colors.white.withOpacity(0.18)),
+            const SizedBox(height: 16),
+            const Text('Nothing in this range',
+                style: TextStyle(color: Colors.white54, fontSize: 15)),
+          ],
+        ),
+      );
 
   Widget _dismissibleCard({
     required String key,

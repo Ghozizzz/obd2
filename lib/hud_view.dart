@@ -30,6 +30,7 @@ class HudView extends StatelessWidget {
     if (template == HudTemplate.bar) {
       const maxKmL = 50.0;
       final value = (d.kmPerLiter / maxKmL).clamp(0.0, 1.0);
+      final avg = (d.avgKmPerLiter / maxKmL).clamp(0.0, 1.0);
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
         child: Column(
@@ -49,11 +50,24 @@ class HudView extends StatelessWidget {
             const SizedBox(height: 24),
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: LinearProgressIndicator(
-                value: value,
-                minHeight: 56,
-                backgroundColor: Colors.white12,
-                valueColor: AlwaysStoppedAnimation(accent),
+              child: SizedBox(
+                height: 56,
+                child: Stack(
+                  children: [
+                    // Live km/L fill.
+                    LinearProgressIndicator(
+                      value: value,
+                      minHeight: 56,
+                      backgroundColor: Colors.white12,
+                      valueColor: AlwaysStoppedAnimation(accent),
+                    ),
+                    // Thin marker line = session average km/L (the benchmark).
+                    Align(
+                      alignment: Alignment(avg * 2 - 1, 0),
+                      child: Container(width: 3, color: Colors.white),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 8),

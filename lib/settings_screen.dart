@@ -240,14 +240,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             _section(
-              icon: Icons.dashboard_customize,
-              title: 'HUD Template',
-              children: _templateFields(),
-            ),
-            _section(
               icon: Icons.palette,
               title: 'HUD Colour',
               children: _colorFields(),
+            ),
+            _section(
+              icon: Icons.dashboard_customize,
+              title: 'HUD Template',
+              children: _templateFields(),
             ),
             _section(
               icon: Icons.flip,

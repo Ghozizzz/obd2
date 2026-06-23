@@ -8,6 +8,7 @@ import 'pids.dart';
 class ObdData {
   const ObdData({
     this.kmPerLiter = 0,
+    this.avgKmPerLiter = 0,
     this.litersPerHour = 0,
     this.throttle = 0,
     this.speed = 0,
@@ -18,6 +19,8 @@ class ObdData {
   });
 
   final double kmPerLiter;
+  /// Running session average km/L (distance-weighted: Σ speed / Σ L·h).
+  final double avgKmPerLiter;
   final double litersPerHour;
   final double throttle; // %
   final int speed;       // km/h
@@ -28,6 +31,7 @@ class ObdData {
 
   ObdData copyWith({
     double? kmPerLiter,
+    double? avgKmPerLiter,
     double? litersPerHour,
     double? throttle,
     int? speed,
@@ -38,6 +42,7 @@ class ObdData {
   }) =>
       ObdData(
         kmPerLiter: kmPerLiter ?? this.kmPerLiter,
+        avgKmPerLiter: avgKmPerLiter ?? this.avgKmPerLiter,
         litersPerHour: litersPerHour ?? this.litersPerHour,
         throttle: throttle ?? this.throttle,
         speed: speed ?? this.speed,
@@ -58,6 +63,10 @@ class ObdService {
   ObdData _state = const ObdData();
   bool _running = false;
   Future<void>? _loopDone;
+
+  // Accumulators for the distance-weighted session average km/L.
+  double _sumSpeed = 0;
+  double _sumLh = 0;
 
   Stream<ObdData> get stream => _controller.stream;
   ObdData get current => _state;
@@ -122,6 +131,8 @@ class ObdService {
 
   Future<void> start() async {
     if (_running) return;
+    _sumSpeed = 0;
+    _sumLh = 0;
     try {
       await _transport.connect();
       _state = _state.copyWith(connected: true, error: null);
@@ -179,9 +190,19 @@ class ObdService {
           }
         }
 
+        final kmPerLiter = maf == null ? 0.0 : FuelCalc.kmPerLiter(maf, speed ?? 0);
+        final litersPerHour = maf == null ? 0.0 : FuelCalc.litersPerHour(maf);
+
+        // Distance-weighted running average: Σ speed / Σ L·h. Ticks are
+        // ~uniform, so dt cancels and the ratio is a true km/L average.
+        _sumSpeed += (speed ?? 0).toDouble();
+        _sumLh += litersPerHour;
+        final avgKmPerLiter = _sumLh > 0 ? _sumSpeed / _sumLh : 0.0;
+
         _state = _state.copyWith(
-          kmPerLiter: maf == null ? 0 : FuelCalc.kmPerLiter(maf, speed ?? 0),
-          litersPerHour: maf == null ? 0 : FuelCalc.litersPerHour(maf),
+          kmPerLiter: kmPerLiter,
+          avgKmPerLiter: avgKmPerLiter,
+          litersPerHour: litersPerHour,
           speed: speed ?? _state.speed,
           throttle: throttle ?? _state.throttle,
           rpm: rpm ?? _state.rpm,

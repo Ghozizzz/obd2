@@ -36,6 +36,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
   Duration _elapsed = Duration.zero;
   ObdData _data = const ObdData(connected: true);
 
+  // Accumulators for a simulated session-average km/L (matches ObdService).
+  double _sumSpeed = 0;
+  double _sumLh = 0;
+
   @override
   void initState() {
     super.initState();
@@ -69,9 +73,16 @@ class _PreviewScreenState extends State<PreviewScreen> {
     // Light pedal → good economy; heavy pedal → poor economy.
     final kmPerLiter = (4 + (1 - wave) * 38).toDouble(); // ~4..42 km/L
     final litersPerHour = 1.2 + wave * 14; // 1.2..15 L/h
+
+    // Distance-weighted running average, mirroring ObdService.
+    _sumSpeed += speed.toDouble();
+    _sumLh += litersPerHour;
+    final avgKmPerLiter = _sumLh > 0 ? _sumSpeed / _sumLh : 0.0;
+
     return ObdData(
       connected: true,
       kmPerLiter: kmPerLiter,
+      avgKmPerLiter: avgKmPerLiter,
       litersPerHour: litersPerHour,
       throttle: throttle,
       speed: speed,

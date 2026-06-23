@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
+import 'app_info.dart';
 import 'fuelio/fuelio_store.dart';
 import 'fuelio/logbook_screen.dart';
 import 'hud_screen.dart';
@@ -76,7 +77,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final service = _service;
     if (current == null || service == null) return;
     final updated = await Navigator.of(context).push<ObdSettings>(
-      MaterialPageRoute(builder: (_) => SettingsScreen(settings: current)),
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(
+          settings: current,
+          tripStore: _tripStore,
+          fuelioStore: _fuelioStore,
+        ),
+      ),
     );
     if (updated == null) return;
     await updated.save();
@@ -131,9 +138,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: service == null
-            ? const Center(child: CircularProgressIndicator())
-            : StreamBuilder<ObdData>(
+        child: Stack(
+          children: [
+            if (service == null)
+              const Center(child: CircularProgressIndicator())
+            else
+              StreamBuilder<ObdData>(
                 stream: service.stream,
                 initialData: service.current,
                 builder: (context, snap) {
@@ -141,6 +151,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   return _menu(d);
                 },
               ),
+            const Positioned(
+              left: 16,
+              bottom: 12,
+              child: Text(
+                'v$kAppVersion',
+                style: TextStyle(color: Colors.white24, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

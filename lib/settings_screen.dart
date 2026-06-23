@@ -1,16 +1,35 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'backup.dart';
+import 'fuelio/fuelio_store.dart';
 import 'obd_settings.dart';
 import 'preview_screen.dart';
+import 'trip_store.dart';
 
 /// Connection settings: choose WiFi or Bluetooth and configure each. Returns
 /// the updated [ObdSettings] via Navigator.pop, or null if cancelled.
+///
+/// Also hosts "Export All" / "Restore" — a full backup of trip history and the
+/// fuel & cost logbook to a single JSON file, for moving to another phone.
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.settings});
+  const SettingsScreen({
+    super.key,
+    required this.settings,
+    this.tripStore,
+    this.fuelioStore,
+  });
 
   final ObdSettings settings;
+  final TripStore? tripStore;
+  final FuelioStore? fuelioStore;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -33,6 +52,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<BluetoothDevice> _bonded = [];
   bool _loadingDevices = false;
   String? _btError;
+
+  /// True while an export/restore is running (disables the buttons).
+  bool _backupBusy = false;
 
   /// A handful of high-contrast presets for the swatch picker.
   static const _swatches = <int>[
@@ -259,10 +281,159 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
+            _section(
+              icon: Icons.backup,
+              title: 'Backup & Restore',
+              children: _backupFields(),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  // ── Backup / restore ───────────────────────────────────────────────────────
+
+  List<Widget> _backupFields() => [
+        const Text(
+          'Save all trip history and the fuel & cost logbook to a single file, '
+          'then restore it on another phone.',
+          style: TextStyle(color: Colors.white54, fontSize: 13),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            icon: _backupBusy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.black),
+                  )
+                : const Icon(Icons.file_download_outlined),
+            label: const Text('Export All'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.cyan,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: _backupBusy ? null : _exportAll,
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.file_upload_outlined),
+            label: const Text('Restore from file'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.cyan,
+              side: const BorderSide(color: Colors.white24),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: _backupBusy ? null : _restoreAll,
+          ),
+        ),
+      ];
+
+  Future<void> _exportAll() async {
+    setState(() => _backupBusy = true);
+    try {
+      final now = DateTime.now();
+      final json = await BackupService.exportAll(
+        trips: widget.tripStore,
+        fuelio: widget.fuelioStore,
+        now: now,
+      );
+
+      Directory dir;
+      try {
+        dir = await getExternalStorageDirectory() ??
+            await getApplicationDocumentsDirectory();
+      } catch (_) {
+        dir = await getApplicationDocumentsDirectory();
+      }
+      final path = p.join(dir.path, BackupService.fileName(now));
+      await File(path).writeAsString(json);
+      if (!mounted) return;
+      _showInfoDialog('Exported', path, selectable: true);
+    } catch (e) {
+      _toast('Export failed: $e');
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
+  Future<void> _restoreAll() async {
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['json', 'txt'],
+        withData: true,
+      );
+      if (picked == null || picked.files.isEmpty) return;
+      final file = picked.files.first;
+      final content = file.bytes != null
+          ? utf8.decode(file.bytes!, allowMalformed: true)
+          : (file.path != null ? await File(file.path!).readAsString() : null);
+      if (content == null) {
+        _toast('Could not read the file');
+        return;
+      }
+
+      setState(() => _backupBusy = true);
+      final summary = await BackupService.importAll(
+        content,
+        trips: widget.tripStore,
+        fuelio: widget.fuelioStore,
+      );
+      if (!mounted) return;
+
+      final f = summary.fuelio;
+      final lines = <String>[
+        '${summary.tripsAdded} trips added'
+            '${summary.tripsSkipped > 0 ? ' (${summary.tripsSkipped} duplicates skipped)' : ''}',
+        if (f != null)
+          '${f.logsAdded} fuel fill-ups added'
+              '${f.logsSkipped > 0 ? ' (${f.logsSkipped} skipped)' : ''}',
+        if (f != null)
+          '${f.costsAdded} costs added'
+              '${f.costsSkipped > 0 ? ' (${f.costsSkipped} skipped)' : ''}',
+      ];
+      _showInfoDialog('Restore complete', lines.join('\n'));
+    } catch (e) {
+      _toast('Restore failed: $e');
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
+  void _showInfoDialog(String title, String body, {bool selectable = false}) =>
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          title: Text(title, style: const TextStyle(color: Colors.white)),
+          content: selectable
+              ? SelectableText(body,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13))
+              : Text(body,
+                  style: const TextStyle(color: Colors.white70, fontSize: 14)),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: FilledButton.styleFrom(
+                  backgroundColor: Colors.cyan, foregroundColor: Colors.black),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   /// A titled card grouping related settings — the building block of the page.
